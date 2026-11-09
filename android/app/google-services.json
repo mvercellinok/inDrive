@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "966005683294",
+    "project_id": "indrive-d7b45",
+    "storage_bucket": "indrive-d7b45.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:966005683294:android:b72a789c06f3bd405270cf",
+        "android_client_info": {
+          "package_name": "com.example.clase_dos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCmRud-rGnNJ8KFHj9yGHMSuJ7MhYk-HPQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
