@@ -9,11 +9,11 @@ import 'firebase_options.dart';
 import 'theme/theme.dart';
 import 'views/lists.dart';
 
+import 'views/home.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MainApp());
 }
 
@@ -24,19 +24,25 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: const HomeScreen(),
+      title: 'inDrive',
+      theme: inDrive,
+      home: HomeScreen(
+        onOpenRoutes: (context) => Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const RoutesScreen())),
+      ),
     );
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class RoutesScreen extends StatefulWidget {
+  const RoutesScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<RoutesScreen> createState() => _RoutesScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _RoutesScreenState extends State<RoutesScreen> {
   final _rutas = FirebaseFirestore.instance.collection('rutas');
   final _mapKey = GlobalKey<_MapaRutasState>();
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _rutasStream;
@@ -50,8 +56,10 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _crearIconoLandscape();
     _rutasStream = _rutas.snapshots();
-    _ultimasRutasStream =
-        _rutas.orderBy('creadoEn', descending: true).limit(10).snapshots();
+    _ultimasRutasStream = _rutas
+        .orderBy('creadoEn', descending: true)
+        .limit(10)
+        .snapshots();
   }
 
   // Crear un marcador con el icono landscape de Material.
@@ -61,11 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final canvas = Canvas(recorder);
     final centro = const Offset(lado / 2, lado / 2);
 
-    canvas.drawCircle(
-      centro,
-      48,
-      Paint()..color = const Color(0xFF6750A4),
-    );
+    canvas.drawCircle(centro, 48, Paint()..color = const Color(0xFF6750A4));
 
     final texto = TextPainter(
       text: TextSpan(
@@ -135,7 +139,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (!sheetContext.mounted) return;
                   ScaffoldMessenger.of(sheetContext).showSnackBar(
                     const SnackBar(
-                      content: Text('No se pudo guardar la ruta. Inténtalo otra vez.'),
+                      content: Text(
+                        'No se pudo guardar la ruta. Inténtalo otra vez.',
+                      ),
                       behavior: SnackBarBehavior.fixed,
                     ),
                   );
@@ -172,7 +178,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             labelText: 'Título',
                             border: OutlineInputBorder(),
                           ),
-                          validator: (value) => value == null || value.trim().isEmpty
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
                               ? 'Ingresa un título'
                               : null,
                         ),
@@ -196,7 +203,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? const SizedBox(
                                     height: 20,
                                     width: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   )
                                 : const Text('Guardar ruta'),
                           ),
@@ -263,7 +272,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       marcadores.add(
                         Marker(
                           markerId: MarkerId(doc.id),
-                          icon: _iconoLandscape ?? BitmapDescriptor.defaultMarker,
+                          icon:
+                              _iconoLandscape ?? BitmapDescriptor.defaultMarker,
                           position: LatLng(lat, lng),
                           infoWindow: InfoWindow(
                             title: ruta['titulo'] as String? ?? '',
@@ -422,7 +432,8 @@ class _MapaRutasState extends State<_MapaRutas> {
 
   void _detectarDobleToque(LatLng posicion) {
     final ahora = DateTime.now();
-    final dobleToque = _ultimoToque != null &&
+    final dobleToque =
+        _ultimoToque != null &&
         ahora.difference(_ultimoToque!).inMilliseconds < 400 &&
         _posicionPrimerToque != null &&
         (posicion.latitude - _posicionPrimerToque!.latitude).abs() < 0.003 &&
@@ -438,9 +449,7 @@ class _MapaRutasState extends State<_MapaRutas> {
   }
 
   Future<void> irA(LatLng posicion) async {
-    await _controller?.animateCamera(
-      CameraUpdate.newLatLngZoom(posicion, 15),
-    );
+    await _controller?.animateCamera(CameraUpdate.newLatLngZoom(posicion, 15));
   }
 
   @override
