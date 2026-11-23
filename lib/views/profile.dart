@@ -5,6 +5,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../theme/theme.dart';
+import 'local_profiles.dart';
+import 'ride_activity.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -29,6 +31,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _guardando = false;
   bool _subiendoFoto = false;
   bool _errorCarga = false;
+  bool _cambiandoPerfil = false;
+  String _perfilActivo = LocalProfiles.principal;
 
   DocumentReference<Map<String, dynamic>> get _perfil {
     final usuario = FirebaseAuth.instance.currentUser;
@@ -69,20 +73,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      final documento = await _perfil.get();
+      final activo = await LocalProfiles.activeId();
+      final alternativo = activo == LocalProfiles.alternate;
+      final datos = alternativo
+          ? await LocalProfiles.readAlternate()
+          : (await _perfil.get()).data() ?? {};
 
       if (!mounted) return;
 
-      final datos = documento.data() ?? {};
       final usuario = FirebaseAuth.instance.currentUser;
 
       _nombre.text = datos['nombre'] as String? ?? '';
       _apellido.text = datos['apellido'] as String? ?? '';
-      _correo.text = datos['correo'] as String? ?? usuario?.email ?? '';
+      _correo.text =
+          datos['correo'] as String? ??
+          (alternativo ? '' : usuario?.email ?? '');
       _telefono.text = datos['telefono'] as String? ?? '';
       _ciudad.text = datos['ciudad'] as String? ?? '';
 
       setState(() {
+        _perfilActivo = activo;
+        _errorFoto = null;
         _fotoUrl = datos['fotoUrl'] as String?;
       });
     } catch (_) {
@@ -101,7 +112,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _cambiarFoto() async {
-    if (_subiendoFoto || _guardando) return;
+    if (_subiendoFoto || _guardando || _cambiandoPerfil) return;
+    final activo = _perfilActivo;
+    if (activo == LocalProfiles.alternate) {
+      _mensaje('El perfil de demostración usa el avatar predeterminado.');
+      return;
+    }
 
     try {
       final imagen = await ImagePicker().pickImage(
@@ -111,7 +127,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         imageQuality: 80,
       );
 
-      if (imagen == null || !mounted) return;
+      if (imagen == null || !mounted || _perfilActivo != activo) return;
 
       setState(() {
         _subiendoFoto = true;
@@ -171,15 +187,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _guardando = true);
 
     try {
-      await _perfil.set({
+      final datos = {
         'nombre': _nombre.text.trim(),
         'apellido': _apellido.text.trim(),
         'correo': _correo.text.trim(),
         'telefono': _telefono.text.trim(),
         'codigoPais': '+56',
         'ciudad': _ciudad.text.trim(),
-        'actualizadoEn': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+      if (_perfilActivo == LocalProfiles.alternate) {
+        await LocalProfiles.saveAlternate(datos);
+      } else {
+        await _perfil.set({
+          ...datos,
+          'actualizadoEn': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
 
       _mensaje('Perfil guardado');
     } catch (_) {
@@ -191,6 +214,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         setState(() => _guardando = false);
       }
+    }
+  }
+
+  Future<void> _cambiarPerfil() async {
+    setState(() => _cambiandoPerfil = true);
+    try {
+      final alternateName = await LocalProfiles.alternateName();
+      if (!mounted) return;
+      final selection = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('Cambiar perfil'),
+          children: [
+            SimpleDialogOption(
+              onPressed: _perfilActivo == LocalProfiles.principal
+                  ? null
+                  : () => Navigator.pop(dialogContext, LocalProfiles.principal),
+              child: const Text('Perfil principal'),
+            ),
+            SimpleDialogOption(
+              onPressed: _perfilActivo == LocalProfiles.alternate
+                  ? null
+                  : () => Navigator.pop(dialogContext, LocalProfiles.alternate),
+              child: Text(alternateName ?? 'Crear otro perfil'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || selection == null) return;
+      String? newName;
+      if (selection == LocalProfiles.alternate && alternateName == null) {
+        var enteredName = '';
+        newName = await showDialog<String>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Crear otro perfil'),
+            content: TextField(
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(labelText: 'Nombre'),
+              onChanged: (value) => enteredName = value.trim(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (enteredName.isNotEmpty) {
+                    Navigator.pop(dialogContext, enteredName);
+                  }
+                },
+                child: const Text('Crear perfil'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted || newName == null) return;
+      }
+      await LocalProfiles.switchTo(selection, newName: newName);
+      if (!mounted) return;
+      await _cargarPerfil();
+    } catch (_) {
+      _mensaje('No se pudo cambiar de perfil. Inténtalo otra vez.');
+    } finally {
+      if (mounted) setState(() => _cambiandoPerfil = false);
     }
   }
 
@@ -462,10 +552,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: AppGap.gapGroup),
 
                         ElevatedButton(
-                          onPressed: _guardando || _subiendoFoto
+                          onPressed:
+                              _guardando || _subiendoFoto || _cambiandoPerfil
                               ? null
                               : _guardar,
                           child: Text(_guardando ? 'GUARDANDO…' : 'GUARDAR'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed:
+                              _guardando || _subiendoFoto || _cambiandoPerfil
+                              ? null
+                              : _cambiarPerfil,
+                          icon: const Icon(Icons.switch_account_outlined),
+                          label: const Text('Cambiar perfil'),
                         ),
 
                         const SizedBox(height: AppGap.gapComponent),
@@ -482,7 +581,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onDestinationSelected: (index) {
           if (index == 0) {
             Navigator.pop(context);
-          } else if (index != 3) {
+          } else if (index == 1 && !_cambiandoPerfil) {
+            Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const RideActivityScreen()),
+            );
+          } else if (index == 2) {
             _mensaje('Esta sección todavía está pendiente.');
           }
         },

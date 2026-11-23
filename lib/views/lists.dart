@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../theme/theme.dart';
 
 class ListsView extends StatelessWidget {
@@ -11,15 +12,11 @@ class ListsView extends StatelessWidget {
 
     return Scaffold(
       // app bar
-      appBar: AppBar(
-        title: const Text('Listas'),
-      ),
+      appBar: AppBar(title: const Text('Listas')),
 
       // lista
       body: ListView(
-        padding: const EdgeInsets.symmetric(
-          vertical: AppSpacing.spacing200,
-        ),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.spacing200),
         children: [
           // item 1
           ListTile(
@@ -28,9 +25,7 @@ class ListsView extends StatelessWidget {
               vertical: AppSpacing.spacing100,
             ),
             leading: ClipRRect(
-              borderRadius: BorderRadius.circular(
-                AppRadius.radius2xl,
-              ),
+              borderRadius: BorderRadius.circular(AppRadius.radius2xl),
               child: Image.asset(
                 'assets/images/kaleko.jpeg',
                 width: AppSpacing.spacing1000,
@@ -38,15 +33,10 @@ class ListsView extends StatelessWidget {
                 fit: BoxFit.cover,
               ),
             ),
-            title: Text(
-              'Kaleko Urdangak',
-              style: text.bodyLarge,
-            ),
+            title: Text('Kaleko Urdangak', style: text.bodyLarge),
             subtitle: Text(
               'Canción 01',
-              style: text.bodyMedium?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
+              style: text.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
             ),
             trailing: IconButton(
               icon: const Icon(Icons.more_vert),
@@ -54,7 +44,6 @@ class ListsView extends StatelessWidget {
             ),
           ),
 
-        
           // item 2
           ListTile(
             contentPadding: const EdgeInsets.symmetric(
@@ -62,9 +51,7 @@ class ListsView extends StatelessWidget {
               vertical: AppSpacing.spacing100,
             ),
             leading: ClipRRect(
-              borderRadius: BorderRadius.circular(
-                AppRadius.radius2xl,
-              ),
+              borderRadius: BorderRadius.circular(AppRadius.radius2xl),
               child: Image.asset(
                 'assets/images/kaleko.jpeg',
                 width: AppSpacing.spacing1000,
@@ -72,15 +59,10 @@ class ListsView extends StatelessWidget {
                 fit: BoxFit.cover,
               ),
             ),
-            title: Text(
-              'Kaleko Urdangak',
-              style: text.bodyLarge,
-            ),
+            title: Text('Kaleko Urdangak', style: text.bodyLarge),
             subtitle: Text(
               'Canción 2',
-              style: text.bodyMedium?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
+              style: text.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
             ),
             trailing: IconButton(
               icon: const Icon(Icons.more_vert),

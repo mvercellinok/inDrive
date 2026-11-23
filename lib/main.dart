@@ -1,20 +1,26 @@
 import 'dart:ui' as ui;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import 'firebase_options.dart';
 import 'theme/theme.dart';
 import 'views/lists.dart';
 
 import 'views/home.dart';
+import 'views/splash_screen.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MainApp());
+}
+
+class _AppScrollBehavior extends MaterialScrollBehavior {
+  const _AppScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const ClampingScrollPhysics();
 }
 
 class MainApp extends StatelessWidget {
@@ -26,10 +32,13 @@ class MainApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'inDrive',
       theme: inDrive,
-      home: HomeScreen(
-        onOpenRoutes: (context) => Navigator.of(
-          context,
-        ).push(MaterialPageRoute<void>(builder: (_) => const RoutesScreen())),
+      scrollBehavior: const _AppScrollBehavior().copyWith(overscroll: false),
+      home: SplashScreen(
+        home: HomeScreen(
+          onOpenRoutes: (context) => Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const RoutesScreen())),
+        ),
       ),
     );
   }
