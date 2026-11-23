@@ -31,6 +31,45 @@
 
   <title>clase_dos</title>
   <link rel="manifest" href="manifest.json">
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBdJkysoQqjU0G9Zf9oTX8mZJJC_oOhDww&amp;language=es&amp;region=CL"></script>
+  <script>
+    (() => {
+      const fields = ['displayName', 'formattedAddress', 'location'];
+      const result = (place) => ({
+        id: place.id,
+        displayName: { text: place.displayName },
+        formattedAddress: place.formattedAddress,
+        location: {
+          latitude: place.location.lat(),
+          longitude: place.location.lng(),
+        },
+      });
+
+      window.inDriveSearchPlaces = async (query) => {
+        const { Place } = await google.maps.importLibrary('places');
+        const { places } = await Place.searchByText({
+          textQuery: query,
+          fields: ['id', ...fields],
+          language: 'es',
+          region: 'cl',
+          locationBias: {
+            center: { lat: -33.4489, lng: -70.6693 },
+            radius: 30000,
+          },
+          maxResultCount: 10,
+        });
+        return JSON.stringify(places.filter((place) => place.location).map(result));
+      };
+
+      window.inDriveGetPlace = async (id) => {
+        const { Place } = await google.maps.importLibrary('places');
+        const place = new Place({ id, requestedLanguage: 'es', requestedRegion: 'cl' });
+        await place.fetchFields({ fields });
+        if (!place.location) throw new Error('El destino no tiene coordenadas.');
+        return JSON.stringify(result(place));
+      };
+    })();
+  </script>
 </head>
 <body>
   <!--

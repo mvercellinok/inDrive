@@ -1,12 +1,14 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 
 import '../theme/theme.dart';
+import 'places_web_stub.dart' if (dart.library.js_interop) 'places_web.dart';
 import 'profile.dart';
 import 'ride_request.dart';
 import 'ride_activity.dart';
@@ -54,6 +56,14 @@ class _Places {
   }
 
   static Future<List<_Lugar>> buscar(String texto) async {
+    if (kIsWeb) {
+      final json = await searchPlacesWeb(texto)
+          .timeout(const Duration(seconds: 20));
+      return (jsonDecode(json) as List<dynamic>)
+          .map((item) => _Lugar.fromJson(item as Map<String, dynamic>))
+          .toList();
+    }
+
     _revisarClave();
 
     final respuesta = await http
@@ -99,6 +109,12 @@ class _Places {
   }
 
   static Future<_Lugar> obtener(String placeId) async {
+    if (kIsWeb) {
+      final json = await getPlaceWeb(placeId)
+          .timeout(const Duration(seconds: 20));
+      return _Lugar.fromJson(jsonDecode(json) as Map<String, dynamic>);
+    }
+
     _revisarClave();
 
     final respuesta = await http
@@ -527,7 +543,9 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (index) {
           if (index == 1) {
             Navigator.of(context).push<void>(
-              MaterialPageRoute(builder: (_) => const RideActivityScreen()),
+              MaterialPageRoute(
+                builder: (_) => RideActivityScreen(onCreate: _buscar),
+              ),
             );
           } else if (index == 3) {
             Navigator.of(context).push(

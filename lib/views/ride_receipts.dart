@@ -15,6 +15,7 @@ class RideReceipt {
     required this.driver,
     required this.fare,
     required this.payment,
+    this.note = '',
   });
 
   final DateTime completedAt;
@@ -23,6 +24,7 @@ class RideReceipt {
   final String driver;
   final int fare;
   final String payment;
+  final String note;
 
   String get id => completedAt.microsecondsSinceEpoch.toString();
 
@@ -48,6 +50,7 @@ class RideReceipt {
     'driver': driver,
     'fare': fare,
     'payment': payment,
+    'note': note,
   };
 
   factory RideReceipt.fromJson(Map<String, dynamic> json) => RideReceipt(
@@ -57,6 +60,7 @@ class RideReceipt {
     driver: json['driver'] as String,
     fare: json['fare'] as int,
     payment: json['payment'] as String,
+    note: json['note'] as String? ?? '',
   );
 }
 
@@ -85,6 +89,17 @@ class RideReceiptStore {
     await temporary.rename(path);
   }
 
+  static Future<void> delete(RideReceipt receipt) async {
+    final profileId = await LocalProfiles.activeId();
+    if (kIsWeb) {
+      _webReceipts.remove('$profileId:${receipt.id}');
+      return;
+    }
+    final directory = await _directory(profileId);
+    final file = File('${directory.path}/${receipt.id}.json');
+    if (await file.exists()) await file.delete();
+  }
+
   static Future<List<RideReceipt>> load() async {
     final profileId = await LocalProfiles.activeId();
     final receipts = <RideReceipt>[];
@@ -110,13 +125,94 @@ class RideReceiptStore {
   }
 }
 
-class RideReceiptScreen extends StatelessWidget {
-  const RideReceiptScreen({super.key, required this.receipt});
+class RideReceiptScreen extends StatefulWidget {
+  const RideReceiptScreen({
+    super.key,
+    required this.receipt,
+    this.editable = false,
+  });
 
   final RideReceipt receipt;
+  final bool editable;
+
+  @override
+  State<RideReceiptScreen> createState() => _RideReceiptScreenState();
+}
+
+class _RideReceiptScreenState extends State<RideReceiptScreen> {
+  late final _note = TextEditingController(text: widget.receipt.note);
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveNote() async {
+    final receipt = widget.receipt;
+    await _change(
+      () => RideReceiptStore.save(
+        RideReceipt(
+          completedAt: receipt.completedAt,
+          pickup: receipt.pickup,
+          destination: receipt.destination,
+          driver: receipt.driver,
+          fare: receipt.fare,
+          payment: receipt.payment,
+          note: _note.text.trim(),
+        ),
+      ),
+      'Nota guardada',
+    );
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Eliminar este recibo?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _change(
+      () => RideReceiptStore.delete(widget.receipt),
+      'Recibo eliminado',
+    );
+  }
+
+  Future<void> _change(Future<void> Function() action, String message) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo actualizar el recibo.')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final receipt = widget.receipt;
     final text = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Recibo del viaje')),
@@ -160,6 +256,25 @@ class RideReceiptScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const Text('Recibo de demostración · Sin cobro real'),
+          if (widget.editable) ...[
+            const SizedBox(height: 16),
+            TextField(
+              controller: _note,
+              enabled: !_busy,
+              maxLength: 160,
+              decoration: const InputDecoration(labelText: 'Nota personal'),
+            ),
+            FilledButton(
+              onPressed: _busy ? null : _saveNote,
+              child: const Text('Guardar nota'),
+            ),
+            TextButton.icon(
+              onPressed: _busy ? null : _delete,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Eliminar recibo'),
+            ),
+          ] else if (receipt.note.isNotEmpty)
+            Text(receipt.note),
         ],
       ),
     );
