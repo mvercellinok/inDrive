@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'ride_receipts.dart';
 
 class RideActivityScreen extends StatefulWidget {
-  const RideActivityScreen({super.key});
+  const RideActivityScreen({super.key, this.onCreate});
+
+  final Future<void> Function()? onCreate;
 
   @override
   State<RideActivityScreen> createState() => _RideActivityScreenState();
@@ -11,6 +13,11 @@ class RideActivityScreen extends StatefulWidget {
 
 class _RideActivityScreenState extends State<RideActivityScreen> {
   late Future<List<RideReceipt>> _receipts = RideReceiptStore.load();
+
+  Future<void> _refreshAfter(Future<void> Function() action) async {
+    await action();
+    if (mounted) setState(() => _receipts = RideReceiptStore.load());
+  }
 
   Widget _history(List<RideReceipt> receipts, {required bool showReceipts}) {
     if (receipts.isEmpty) {
@@ -24,7 +31,7 @@ class _RideActivityScreenState extends State<RideActivityScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
       itemCount: receipts.length,
       itemBuilder: (context, index) {
         final receipt = receipts[index];
@@ -38,11 +45,14 @@ class _RideActivityScreenState extends State<RideActivityScreen> {
             title: Text(receipt.destination),
             subtitle: Text(receipt.formattedDate),
             trailing: Text(receipt.formattedFare),
-            onTap: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(
-                builder: (_) => RideReceiptScreen(receipt: receipt),
-              ),
-            ),
+            onTap: () => _refreshAfter(() async {
+              await Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      RideReceiptScreen(receipt: receipt, editable: true),
+                ),
+              );
+            }),
           ),
         );
       },
@@ -62,6 +72,13 @@ class _RideActivityScreenState extends State<RideActivityScreen> {
           ],
         ),
       ),
+      floatingActionButton: widget.onCreate == null
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _refreshAfter(widget.onCreate!),
+              icon: const Icon(Icons.add),
+              label: const Text('Nuevo viaje'),
+            ),
       body: FutureBuilder<List<RideReceipt>>(
         future: _receipts,
         builder: (context, snapshot) {

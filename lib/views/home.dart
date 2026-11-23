@@ -527,7 +527,9 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (index) {
           if (index == 1) {
             Navigator.of(context).push<void>(
-              MaterialPageRoute(builder: (_) => const RideActivityScreen()),
+              MaterialPageRoute(
+                builder: (_) => RideActivityScreen(onCreate: _buscar),
+              ),
             );
           } else if (index == 3) {
             Navigator.of(context).push(
