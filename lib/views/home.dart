@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 
 import '../theme/theme.dart';
 import 'profile.dart';
+import 'ride_request.dart';
+import 'ride_activity.dart';
 
 const _placesKey = String.fromEnvironment('PLACES_API_KEY');
 
@@ -207,21 +209,54 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _buscar() async {
     final resultado = await Navigator.of(context)
-        .push<({_Lugar lugar, String consulta})>(
+        .push<({_Lugar? lugar, String consulta})>(
           MaterialPageRoute(builder: (_) => const _BuscarLugar()),
         );
 
     if (!mounted || resultado == null) return;
 
-    await _mostrarYGuardar(resultado.lugar, resultado.consulta);
+    await _confirmarDestino(resultado.lugar, resultado.consulta);
   }
 
-  Future<void> _mostrarYGuardar(_Lugar lugar, String consulta) async {
-    if (!mounted) return;
+  Future<void> _confirmarDestino(_Lugar? lugar, String consulta) async {
+    final confirmado = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => RideRequestScreen(
+          destination: lugar?.nombre ?? consulta,
+          address: lugar?.direccion,
+          position: lugar?.posicion,
+          searchPickup: (rideContext) async {
+            final result = await Navigator.of(rideContext)
+                .push<({_Lugar? lugar, String consulta})>(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const _BuscarLugar(title: 'Buscar recogida'),
+                  ),
+                );
+            if (result == null) return null;
+            final place = result.lugar;
+            return (
+              label: place == null
+                  ? result.consulta
+                  : (place.direccion.isEmpty ? place.nombre : place.direccion),
+              position: place?.posicion,
+            );
+          },
+          onDestinationConfirmed: () {
+            _mostrarYGuardar(lugar, consulta);
+          },
+        ),
+      ),
+    );
+    if (confirmado == true && mounted) {
+      setState(() => _seleccionado = null);
+    }
+  }
 
-    setState(() {
-      _seleccionado = lugar;
-    });
+  Future<void> _mostrarYGuardar(_Lugar? lugar, String consulta) async {
+    if (!mounted) return;
+    setState(() => _seleccionado = lugar);
+    if (lugar == null) return;
 
     try {
       await _mapController?.animateCamera(
@@ -268,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      await _mostrarYGuardar(lugar, consulta);
+      await _confirmarDestino(lugar, consulta);
     } catch (error) {
       _mensaje(error.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -366,12 +401,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
           // PANEL INFERIOR
-          DraggableScrollableSheet(
-            initialChildSize: 0.55,
-            minChildSize: 0.55,
-            maxChildSize: 0.9,
-            builder: (context, scrollController) {
-              return Container(
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: FractionallySizedBox(
+              heightFactor: 0.55,
+              widthFactor: 1,
+              child: Container(
                 decoration: const BoxDecoration(
                   color: AppColors.neutral0,
                   borderRadius: BorderRadius.vertical(
@@ -380,23 +415,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   boxShadow: AppElevation.elevation5,
                 ),
                 child: ListView(
-                  controller: scrollController,
                   padding: const EdgeInsets.all(AppPadding.paddingLg),
                   children: [
-                    Center(
-                      child: Container(
-                        width: AppSpacing.spacing900,
-                        height: AppSpacing.spacing100,
-                        decoration: BoxDecoration(
-                          color: AppColors.neutral400,
-                          borderRadius: BorderRadius.circular(
-                            AppRadius.radiusSm,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppGap.gapGroup),
-
                     // BUSCADOR
                     Material(
                       color: AppColors.primary50,
@@ -466,8 +486,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             _servicio(
                               ancho,
-                              'City Rides',
-                              'Name your price',
+                              'Pedir un auto',
+                              'Ofrece tu precio',
                               Icons.directions_car_outlined,
                               principal: true,
                             ),
@@ -495,8 +515,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ],
       ),
@@ -505,7 +525,11 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: AppColors.neutral0,
         indicatorColor: AppColors.primary50,
         onDestinationSelected: (index) {
-          if (index == 3) {
+          if (index == 1) {
+            Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const RideActivityScreen()),
+            );
+          } else if (index == 3) {
             Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const ProfileScreen()),
             );
@@ -668,7 +692,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
 // PANTALLA PARA BUSCAR Y ELEGIR UN LUGAR
 class _BuscarLugar extends StatefulWidget {
-  const _BuscarLugar();
+  const _BuscarLugar({this.title = 'Buscar destino'});
+
+  final String title;
 
   @override
   State<_BuscarLugar> createState() => _BuscarLugarState();
@@ -729,7 +755,7 @@ class _BuscarLugarState extends State<_BuscarLugar> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Buscar destino')),
+      appBar: AppBar(title: Text(widget.title)),
       body: Column(
         children: [
           Padding(
@@ -749,6 +775,20 @@ class _BuscarLugarState extends State<_BuscarLugar> {
                 ),
               ),
             ),
+          ),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _texto,
+            builder: (context, value, child) {
+              final direccion = value.text.trim();
+              return TextButton.icon(
+                onPressed: direccion.isEmpty
+                    ? null
+                    : () => Navigator.of(context)
+                          .pop((lugar: null as _Lugar?, consulta: direccion)),
+                icon: const Icon(Icons.edit_location_alt_outlined),
+                label: const Text('Usar dirección escrita'),
+              );
+            },
           ),
           if (_cargando) const LinearProgressIndicator(),
           if (_error != null)
